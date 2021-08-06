@@ -54,6 +54,7 @@ struct cups_header{
     BYTE        pbytMsgtype[4+1];
 };
 struct cups_bitmap{
+    BYTE        bytRaw[16+1];
     BYTE        bytIsExtend;
     BYTE        pbytFlags[128];
 };
@@ -71,6 +72,7 @@ struct cups_message{
  FUNCTIONS
  */
 CUPS_MESSAGE_t *CUPS8583_parseMessage( BYTE *pchBuf , char *pchErrmsg );
+void            CUPS8583_freeMessage( CUPS_MESSAGE_t *pmessage );
 int             CUPS8583_parseHeader(  BYTE *pchBuf , CUPS_HEADER_t *pheader );
 int             CUPS8583_parseBitmap(  BYTE *pchBuf , CUPS_BITMAP_t *pbitmap );
 int             CUPS8583_parseFields(  BYTE *pchBuf , CUPS_BITMAP_t *bitmap , CUPS_FIELD_t  *pfields );

@@ -21,5 +21,6 @@ int main(int argc, char const *argv[])
 	} else {
 		CUPS8583_printMessage( message );
 	}
+	CUPS8583_freeMessage(message);
 	return 0;
 }

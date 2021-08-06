@@ -44,7 +44,7 @@ ISO8583_FILED_DEF_t ISO8583_FIELDS_DEF[128] = {
     /* FIELD 39 */ {"Response Code                       ", 2  , 0 , ISO8583_FIELDTYPE_NUM},
     /* FIELD 40 */ {""                                    , 0  , 0 , ISO8583_FIELDTYPE_DEF},
     /* FIELD 41 */ {"Card Acceptor Terminal Id           ", 8  , 0 , ISO8583_FIELDTYPE_ASC},
-    /* FIELD 42 */ {"Card Acceptor Identification Code.  ", 15 , 0 , ISO8583_FIELDTYPE_ASC},
+    /* FIELD 42 */ {"Card Acceptor Identification Code   ", 15 , 0 , ISO8583_FIELDTYPE_ASC},
     /* FIELD 43 */ {"Card Acceptor Name/Location         ", 40 , 0 , ISO8583_FIELDTYPE_ASC},
     /* FIELD 44 */ {"Additional Response Data            ", 25 , 2 , ISO8583_FIELDTYPE_ASC},
     /* FIELD 45 */ {"Track 1 Data                        ", 76 , 2 , ISO8583_FIELDTYPE_BIN},
@@ -152,8 +152,7 @@ CUPS_MESSAGE_t *CUPS8583_parseMessage( BYTE *pchBuf , char *pchErrmsg )
     ret = CUPS8583_parseHeader( pchBuf, &(pmessage->header) );
     if ( ret != CUPS_HEADER_LENGTH + 4 ){
         if ( pchErrmsg )    sprintf( pchErrmsg , "parse header fail");
-        free( pmessage );
-        return NULL;
+        goto parse_fail;
     }
     pchBuf += ret;
 
@@ -163,10 +162,31 @@ CUPS_MESSAGE_t *CUPS8583_parseMessage( BYTE *pchBuf , char *pchErrmsg )
 
     /* parse fields */
     ret = CUPS8583_parseFields(pchBuf , &(pmessage->bitmap) , pmessage->fields);
-
+    if ( ret < 0 ){
+        if ( pchErrmsg ) sprintf( pchErrmsg , "parse header fail");
+        goto parse_fail;
+    }
+    
     return pmessage;
+
+parse_fail:
+    CUPS8583_freeMessage( pmessage );
+    return NULL;
 }
 
+/*
+ Free message
+ */
+void CUPS8583_freeMessage( CUPS_MESSAGE_t *pmessage )
+{
+    for( int i = 1 ; i < (pmessage->bitmap.bytIsExtend == 1 ? 128 : 64) ; i ++){
+        if ( pmessage->bitmap.pbytFlags[i] == '1' && pmessage->fields[i].pchData != NULL ){
+            free(pmessage->fields[i].pchData);
+        }
+    }
+    free(pmessage);
+    return;
+}
 /* 
  Parse header from pchBuf
  returns total offset if succeeded ,for CUPS header offset should be 50
@@ -239,6 +259,7 @@ int CUPS8583_parseBitmap( BYTE *pchBuf , CUPS_BITMAP_t *pbitmap )
         pbitmap->bytIsExtend = 0;
         offset = 8;
     }
+    memcpy( pbitmap->bytRaw , pchBuf , offset);
     for ( i = 0 ; i < offset ; i ++ )
         for ( j = 0 ; j < 8 ; j ++ )
             pbitmap->pbytFlags[i*8+j] = (pchBuf[i] & 1<<(7-j) ) == 0 ? '0' : '1';
@@ -252,7 +273,7 @@ int CUPS8583_parseFields( BYTE *pchBuf , CUPS_BITMAP_t *bitmap , CUPS_FIELD_t  *
 {
     int  i = 0;
     char temp[4];
-    int  var = 0;
+    BYTE *start = pchBuf;
     for ( i = 1 ; i < 128 ; i ++ ){
         if ( bitmap->pbytFlags[i] == '1' ){
             /* check if field has variable length */
@@ -274,14 +295,14 @@ int CUPS8583_parseFields( BYTE *pchBuf , CUPS_BITMAP_t *bitmap , CUPS_FIELD_t  *
             pchBuf += pfields[i].intDataLength;
         }
     }
-    return 0;
+    return pchBuf - start;
 }
 /*
  Print message
  */
 void CUPS8583_printMessage( CUPS_MESSAGE_t *pmessage)
 {
-    printf("==================   Header      ==================\n");
+    printf("==================   Header Start     ==================\n");
     CUPS8583_printHex( pmessage->header.pbytHeaderLength,       1  , "HEADER LENGTH"        , 1);
     CUPS8583_printHex( pmessage->header.pbytHeaderFlagVersion,  1  , "HEADER FLAG VERSION"  , 2);
     CUPS8583_printHex( pmessage->header.pbytTotalMessageLength, 4  , "TOTAL MESSAGE LENGTH" , 3);
@@ -292,34 +313,37 @@ void CUPS8583_printMessage( CUPS_MESSAGE_t *pmessage)
     CUPS8583_printHex( pmessage->header.pbytTransactionInfo,    8  , "TRASACTION INFORMATION",8);
     CUPS8583_printHex( pmessage->header.pbytUserInfo,           1  , "USER INFORMATION"     , 9);
     CUPS8583_printHex( pmessage->header.pbytRejectCode,         5  , "REJECT CODE"          , 10);
+    printf("==================   Header End       ==================\n\n");
 
-    printf("==================  Msg Type     ==================\n");
     CUPS8583_printHex( pmessage->header.pbytMsgtype,            4  , "MSGTYPE"              , 0);
+    printf("\n");
 
-    printf("==================   Bit Map     ==================\n");
-    for( int i = 0 ; i < (pmessage->bitmap.bytIsExtend == 1 ? 128 : 64) ; i ++){
-        printf("%c" , pmessage->bitmap.pbytFlags[i]);
-        if ( (i+1) % 8 == 0 )   printf(" ");
-        if ( (i+1) % 32 == 0 )   printf("\n");
-    }
-
-    printf("==================  Body Fields  ==================\n");
+    printf("==================   Fields Start     ==================\n");
+    CUPS8583_printHex( pmessage->bitmap.bytRaw,pmessage->bitmap.bytIsExtend==1 ? 16 : 8 ,"BITMAP", 1);
     for( int i = 1 ; i < (pmessage->bitmap.bytIsExtend == 1 ? 128 : 64) ; i ++){
         if ( pmessage->bitmap.pbytFlags[i] == '1' ){
             CUPS8583_printHex( pmessage->fields[i].pchData , pmessage->fields[i].intDataLength  , ISO8583_FIELDS_DEF[i].pbytInfo , i+1 );
         }
     }
+    printf("==================   Fields End       ==================\n");
     return;
 }
 void CUPS8583_printHex( BYTE *buf , int size , char *info , int index)
 {
-    int i = 0;
-    int j = 0;
-    char ch = 0;
-    for ( i = 0 ; i <= size/16 ; i ++){
-        printf( "FIELD[%3d][LEN:%3d][%-40s]< " , index , size , info);
+    int   i = 0;
+    int   j = 0;
+    BYTE ch = 0;
+    int   prefix = 0;
+    for ( i = 0 ; i <= (size-1)/16 ; i ++){
+        if (i == 0){
+            prefix = printf( "FIELD[%3d][LEN:%3d][%-37s]" , index , size , info);
+        } else {
+            for( int k = 0 ; k < prefix ; k ++) 
+                printf(" ");
+        }
+        printf("< ");
         for ( j = 0 ; j+i*16 < size && j < 16 ;j ++){
-            ch = (unsigned char)buf[j+i*16];
+            ch = (BYTE)buf[j+i*16];
             printf( "%02X " , ch);
         }
         while ( j++ < 16 ){
@@ -338,6 +362,4 @@ void CUPS8583_printHex( BYTE *buf , int size , char *info , int index)
    }
    return;
 }
-
-
 
