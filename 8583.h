@@ -1,25 +1,13 @@
 #ifndef _CUPS8583_H_
 #define _CUPS8583_H_
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 /*
  DEFINES
  */
-#define ISO8583_FIELDTYPE_DEF       0
-#define ISO8583_FIELDTYPE_BIN       1
-#define ISO8583_FIELDTYPE_NUM       1<<1
-#define ISO8583_FIELDTYPE_ASC       1<<2
-#define ISO8583_FIELDTYPE_BCD       1<<3
 #define CUPS_HEADER_LENGTH          46
-
-/*
- MACROS
- */
-#define IS_FIELDTYPE_BIN(f) (f.bytType & ISO8583_FIELDTYPE_BIN)
-#define IS_FIELDTYPE_NUM(f) (f.bytType & ISO8583_FIELDTYPE_NUM)
-#define IS_FIELDTYPE_ASC(f) (f.bytType & ISO8583_FIELDTYPE_ASC)
-#define IS_FIELDTYPE_BCD(f) (f.bytType & ISO8583_FIELDTYPE_BCD)
 
 /*
  TYPES
@@ -35,10 +23,9 @@ typedef struct cups_message             CUPS_MESSAGE_t;
  STRUCTURES
  */
 struct iso8583_field_def {     
-    BYTE        pbytInfo[37];
+    char        pbytInfo[37];
     int         intMaxLengthInBytes;
     int         intVarFlag;
-    BYTE        bytType;
 };
 struct cups_header{
     BYTE        pbytHeaderLength[1+1];
@@ -54,13 +41,13 @@ struct cups_header{
     BYTE        pbytMsgtype[4+1];
 };
 struct cups_bitmap{
-    BYTE        bytRaw[16+1];
     BYTE        bytIsExtend;
+    BYTE        bytRaw[16+1];
     BYTE        pbytFlags[128];
 };
 struct cups_field{
-    BYTE        *pchData;
     int         intDataLength;
+    BYTE        *pchData;
 };
 struct cups_message{
     CUPS_HEADER_t   header;
@@ -73,9 +60,10 @@ struct cups_message{
  */
 CUPS_MESSAGE_t *CUPS8583_parseMessage( BYTE *pchBuf , char *pchErrmsg );
 void            CUPS8583_freeMessage( CUPS_MESSAGE_t *pmessage );
-int             CUPS8583_parseHeader(  BYTE *pchBuf , CUPS_HEADER_t *pheader );
-int             CUPS8583_parseBitmap(  BYTE *pchBuf , CUPS_BITMAP_t *pbitmap );
-int             CUPS8583_parseFields(  BYTE *pchBuf , CUPS_BITMAP_t *bitmap , CUPS_FIELD_t  *pfields );
+int             CUPS8583_parseHeader( BYTE *pchBuf , CUPS_HEADER_t *pheader );
+int             CUPS8583_parseBitmap( BYTE *pchBuf , CUPS_BITMAP_t *pbitmap );
+int             CUPS8583_parseFields( BYTE *pchBuf , CUPS_BITMAP_t *bitmap , CUPS_FIELD_t  *pfields );
+CUPS_FIELD_t   *CUPS8583_getField( CUPS_MESSAGE_t *pmessage , int index);
 void            CUPS8583_printMessage( CUPS_MESSAGE_t *message);
-void            CUPS8583_printHex( BYTE *buf , int size , char *info , int index );
+void            CUPS8583_printHex( BYTE *buf , char *type , int index , int size , char *info);
 #endif
