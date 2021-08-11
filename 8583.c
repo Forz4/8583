@@ -289,7 +289,7 @@ int CUPS8583_parseFields( BYTE *pchBuf , CUPS_BITMAP_t *bitmap , CUPS_FIELD_t  *
             } else {
                 pfields[i].intDataLength  = ISO8583_FIELDS_DEF[i].intMaxLengthInBytes;
             }
-            pfields[i].pchData = (BYTE *)malloc(pfields->intDataLength);
+            pfields[i].pchData = (BYTE *)malloc(pfields[i].intDataLength);
             memcpy( pfields[i].pchData , pchBuf , pfields[i].intDataLength);
             pchBuf += pfields[i].intDataLength;
         }

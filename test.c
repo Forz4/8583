@@ -14,6 +14,11 @@ int main(int argc, char const *argv[])
 		i++;
 	}
 	fclose(fp);
+    
+    fp = fopen("2100.tpl" , "a+");
+    fwrite( buf , 1 , i , fp);
+    fclose(fp);
+
 	CUPS_MESSAGE_t *message = CUPS8583_parseMessage( buf , errmsg);
 	if ( message == NULL )
 	{
